@@ -1,0 +1,109 @@
+groups:
+  - name: porter
+    rules:
+      - alert: PorterTargetDown
+        expr: up{job="porter"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: Porter metrics target is unavailable
+          description: Prometheus has been unable to scrape Porter for 2 minutes.
+
+      - alert: PorterHighErrorRate
+        expr: |
+          (
+            sum(rate(porter_request_failures_total[5m]))
+            /
+            sum(rate(porter_requests_total[5m]))
+          ) > 0.05
+          and
+          sum(rate(porter_requests_total[5m])) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Porter request error rate is above 5%
+          description: More than 5% of Porter requests have failed over the last 5 minutes.
+
+      - alert: PorterP95LatencyHigh
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (le) (
+              rate(porter_request_duration_seconds_bucket[5m])
+            )
+          ) > 1
+          and
+          sum(rate(porter_request_duration_seconds_count[5m])) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Porter p95 request latency is above 1 second
+          description: Porter p95 request latency has exceeded 1 second for 5 minutes.
+
+      - alert: PorterFallbackBurst
+        expr: sum(increase(porter_provider_fallbacks_total[10m])) > 5
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: Porter is using provider fallback frequently
+          description: More than 5 provider fallback attempts occurred in the last 10 minutes.
+
+  - name: host
+    rules:
+      - alert: NodeExporterDown
+        expr: up{job="node"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: Host metrics target is unavailable
+          description: Prometheus has been unable to scrape node_exporter for 2 minutes.
+
+      - alert: HostMemoryHigh
+        expr: (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) > 0.90
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: Host memory usage is above 90%
+          description: Available host memory has remained below 10% for 10 minutes.
+
+      - alert: HostFilesystemUsageHigh
+        expr: |
+          (
+            1
+            -
+            (
+              node_filesystem_avail_bytes{fstype!~"tmpfs|devtmpfs|overlay|squashfs"}
+              /
+              node_filesystem_size_bytes{fstype!~"tmpfs|devtmpfs|overlay|squashfs"}
+            )
+          ) > 0.80
+          and on(instance, device, mountpoint)
+          node_filesystem_readonly == 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: Host filesystem usage is above 80%
+          description: A writable host filesystem has remained above 80% usage for 10 minutes.
+
+      - alert: HostCpuHigh
+        expr: |
+          (
+            1
+            -
+            avg without (cpu) (
+              rate(node_cpu_seconds_total{mode="idle"}[5m])
+            )
+          ) > 0.90
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: Host CPU usage is above 90%
+          description: Average host CPU usage has remained above 90% for 10 minutes.

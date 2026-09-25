@@ -2,41 +2,54 @@
 
 [![CI](https://github.com/BrentDean/porter/actions/workflows/ci.yml/badge.svg)](https://github.com/BrentDean/porter/actions/workflows/ci.yml)
 
-Porter is a local-first AI control plane designed for private operation. It owns orchestration, policy, routing, deterministic execution, persistence, and provider selection while treating inference engines and external systems as replaceable adapters.
+**A local-first AI assistant built as an observable, recoverable Python service—not just a chat interface.**
 
-Porter treats generative AI as one execution path rather than the default for every request. Deterministic intents and tools handle work that can be performed reliably without an LLM; inference is used only after those paths and Porter's policy boundaries are evaluated.
+Porter routes requests through deterministic intents and tools before considering model inference. It combines an interactive CLI and local browser interface with durable tasks, reminders and timers, a KDE desktop tray, and a background delivery worker. Local Ollama inference is optional; cloud fallback requires explicit per-request approval and policy eligibility.
 
-## Architecture
+**Stack:** Python 3.11+ · SQLite · FastAPI · PySide6 · Docker/Compose · systemd · Prometheus · Grafana · pytest · Ruff · GitHub Actions
 
-```text
-RequestContext
-    -> deterministic intents
-    -> deterministic tools
-    -> PolicyEngine
-    -> ModelRouter
-    -> ProviderExecutor
-    -> InferenceProvider
+**New here?** Follow the [five-minute project walkthrough](docs/project-walkthrough.md) for a reproducible demonstration of the request path, desktop timers, monitoring, and recovery.
+
+## See it work
+
+| Try | What happens |
+| --- | --- |
+| `porter "what is 5+6?"` | A deterministic arithmetic tool answers without calling an LLM (requires `qalc`). |
+| `porter "set a timer for 30 seconds"` | Porter persists a timer; its systemd user worker delivers it, and the optional tray shows a live countdown and Porter-owned popup. |
+| `porter "explain DNS"` | An unmatched request uses configured local Ollama inference. Cloud access is not silently substituted when local inference is unavailable. |
+| `porter reliability --window 24h` | A report derives success rate, latency percentiles, and error-budget status from persisted request telemetry. |
+
+The web interface and monitoring UIs run on **localhost by default**. Porter is a self-hosted project, not a publicly hosted, authenticated SaaS demo.
+
+## Engineering evidence
+
+| Area | Implemented work | Where to inspect it |
+| --- | --- | --- |
+| **Application architecture** | Separate request dispatch, authorization/policy, provider selection, execution, and persistence. | [Separation of duties](docs/architecture/0001-separation-of-duties.md) · [Request and web API](docs/architecture/web-api.md) |
+| **Reliability** | Retry/backoff, atomic reminder claims, stale-claim recovery, provider failure/fallback tests, graceful shutdown, and latency/error-budget reporting. | [Resilience tests](docs/architecture/resilience-testing.md) · [Reliability reporting](docs/architecture/reliability-reporting.md) |
+| **Operations** | Health/readiness endpoints, bounded Prometheus metrics, structured JSON logs, Grafana dashboard, alert rules, and container monitoring smoke tests. | [Monitoring stack](docs/architecture/monitoring-stack.md) · [Structured logging](docs/architecture/structured-logging.md) |
+| **Data protection** | Online SQLite snapshots, integrity verification, optional retention, and restore to a *new* database without replacing live state. | [Local data protection](docs/architecture/local-data-protection.md) · [Backup tests](tests/test_backup.py) |
+| **Desktop integration** | systemd user worker, KDE/XDG tray autostart, private Unix-socket notifications, and a `notify-send` fallback. | [Service management](docs/architecture/local-service-management.md) · [Desktop notifications](docs/architecture/desktop-notifications.md) |
+| **Automated verification** | Python 3.11/3.12 tests, Ruff, a dedicated fault-injection test slice, container and monitoring smoke tests, and publication/secret scans. | [CI](.github/workflows/ci.yml) · [Publication verification](.github/workflows/publication-verification.yml) |
+
+## Request path
+
+```mermaid
+flowchart TD
+    A["CLI / localhost web API"] --> B["RequestDispatcher"]
+    B -->|deterministic match| C["Intents and tools"]
+    B -->|inference needed| D["PolicyEngine"]
+    D --> E["ModelRouter"]
+    E --> F["ProviderExecutor"]
+    F --> G["Local Ollama"]
+    F -. "Explicitly authorized cloud fallback" .-> H["Optional OpenAI"]
 ```
 
-The same application boundaries are reused by the CLI, browser/API surface, desktop tray, and background reminder service rather than reimplementing policy or domain behavior in each interface.
-
-## Key capabilities
-
-- **Deterministic-before-generative execution:** HassIL intent recognition, Porter-owned handlers, Qalculate arithmetic/unit conversion, and local system actions are attempted before inference where appropriate.
-- **Policy-governed inference:** local Ollama and optional OpenAI providers sit behind privacy policy, action authorization, provider health, capability routing, and fallback execution.
-- **Durable local state:** SQLite migrations back tasks, reminders, memory, training/recognition data, inference cache state, and operational telemetry.
-- **Local data protection:** consistent online SQLite backups, opt-in snapshot retention, verified restore into a new database, and a documented daily systemd user timer keep recovery local.
-- **Persistent memory and caching:** principal-scoped explicit memory retains provenance, while bounded SQLite inference caching preserves usage/cost metadata without becoming authoritative state.
-- **Tasks, reminders, and timers:** principal-scoped task/planner views, second-precision one-shot reminders and restartable timers, retry/backoff, stale-claim recovery, tray-anchored Porter notifications with `notify-send` fallback, and live tray timer countdowns.
-- **Weather and local tools:** NWS, Open-Meteo, and optional Synoptic weather evidence plus deterministic arithmetic, storage inspection, and Plex service control.
-- **Operational observability:** persisted request/provider/tool telemetry, Prometheus-compatible metrics, request-correlated privacy-bounded JSON logs, liveness/readiness endpoints, and an optional Prometheus/Grafana/node_exporter monitoring stack.
-- **Reliability engineering:** SLO-style success/latency/error-budget reporting plus deterministic resilience tests for provider, cache, telemetry, reminder, and shutdown failures.
-- **Multiple interfaces:** canonical CLI, localhost FastAPI browser/API surface, optional PySide6 tray, and a lightweight background reminder service.
-- **Containerized runtime and CI:** non-root Docker/Compose deployment, persistent SQLite volume, health/readiness smoke tests, Ruff, pytest, and an explicit resilience test slice in GitHub Actions.
+The tray and background reminder worker use the same reminder/domain storage without becoming additional inference dispatchers or delivery workers. See [architecture documentation](docs/README.md) for the component boundaries.
 
 ## Quick start
 
-From a source checkout:
+From a source checkout (Python 3.11+; on Debian/Ubuntu install `qalc` for arithmetic and `libnotify-bin` for desktop notifications):
 
 ```bash
 python -m venv .venv
@@ -150,6 +163,9 @@ porter web
 
 `porter-service`, `porter-tray`, and `porter-web` remain available temporarily as compatibility aliases. New documentation and launch configuration should use the `porter <command>` forms.
 
+<details>
+<summary>Detailed runtime behavior, architecture boundaries, and persistence semantics</summary>
+
 ## Detailed runtime behavior
 
 One-shot reminder intents support bounded relative second/minute/hour durations, 12-hour clock times, optional today/tomorrow qualification, listing scheduled reminders, and cancellation by exact message or reminder ID. Timer intents support starting one timer for 1–100 seconds, minutes or hours, listing active timers with time remaining, and cancellation by name or ID (or with no ID if only one timer is active). Timers share the reminder persistence and delivery state machine rather than running another scheduler. `ReminderRunner.run_once()` first recovers delivery claims older than its bounded claim lease, discovers delivery-ready scheduled reminders across principals, then atomically changes each still-due reminder to `delivering` before invoking the delivery adapter. A stale candidate that was edited, snoozed, or cancelled before the atomic claim is skipped. Once claimed, interactive lifecycle mutations reject the transient `delivering` state rather than overwriting the worker's claim. Expected endpoint failures return the reminder to `scheduled` with durable retry backoff; successful delivery transitions the claim to `delivered`. Unexpected programming or persistence failures propagate. The runner intentionally provides at-least-once rather than exactly-once delivery: a process failure after an external notification succeeds but before finalization may leave a delivery claim that is later recovered and retried. The current claim lease is five minutes, comfortably longer than the desktop notification adapter's bounded execution timeout. `PorterService` repeatedly invokes the runner without overlapping passes, performs an immediate startup pass for overdue reminders, and waits interruptibly between passes. Recurrence remains a separate later layer.
@@ -222,6 +238,8 @@ SQL migrations are packaged with Porter and recorded in `schema_migrations`. Tel
 `porter backup create` uses SQLite's online backup API to create a consistent local snapshot under the Porter data directory by default. Each backup is integrity-checked before finalization and may be verified later with `porter backup verify`. `porter backup restore <backup> --destination <new-path>` recovers a verified, migrated copy without overwriting existing state. Replacing the active database remains deferred until all database writers can be stopped safely.
 
 Use `porter backup create --keep 14` to retain the new snapshot and the 13 newest previous snapshots after a successful backup. Without `--keep`, backups are not pruned. Daily scheduling is an opt-in setup using a systemd user timer; installing or updating Porter does not enable it. See [Local data protection](docs/architecture/local-data-protection.md) for retention safeguards, timer setup, and recovery instructions.
+
+</details>
 
 ## Container runtime
 

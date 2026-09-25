@@ -1,5 +1,7 @@
 # Porter documentation
 
+Start with the [five-minute project walkthrough](project-walkthrough.md) for a runnable demonstration of requests, timers, monitoring, and recovery.
+
 Porter's documentation is split by purpose so implementation changes do not require rewriting every document.
 
 ## Documentation roles

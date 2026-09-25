@@ -25,7 +25,7 @@ The same application boundaries are reused by the CLI, browser/API surface, desk
 - **Deterministic-before-generative execution:** HassIL intent recognition, Porter-owned handlers, Qalculate arithmetic/unit conversion, and local system actions are attempted before inference where appropriate.
 - **Policy-governed inference:** local Ollama and optional OpenAI providers sit behind privacy policy, action authorization, provider health, capability routing, and fallback execution.
 - **Durable local state:** SQLite migrations back tasks, reminders, memory, training/recognition data, inference cache state, and operational telemetry.
-- **Local data protection:** online SQLite backups use SQLite's backup API, verify integrity before finalization, and remain entirely on user-selected local storage.
+- **Local data protection:** consistent online SQLite backups, opt-in snapshot retention, verified restore into a new database, and a documented daily systemd user timer keep recovery local.
 - **Persistent memory and caching:** principal-scoped explicit memory retains provenance, while bounded SQLite inference caching preserves usage/cost metadata without becoming authoritative state.
 - **Tasks, reminders, and timers:** principal-scoped task/planner views, second-precision one-shot reminders and restartable timers, retry/backoff, stale-claim recovery, tray-anchored Porter notifications with `notify-send` fallback, and live tray timer countdowns.
 - **Weather and local tools:** NWS, Open-Meteo, and optional Synoptic weather evidence plus deterministic arithmetic, storage inspection, and Plex service control.
@@ -133,7 +133,9 @@ porter doctor
 porter reliability --window 24h
 porter backup create
 porter backup list
-porter backup verify ~/.local/share/porter/backups/<backup>.db
+porter backup create --keep 14
+porter backup verify /path/to/backup.db
+porter backup restore /path/to/backup.db --destination /path/to/new-recovery.db
 porter config set ollama.model qwen2.5:7b
 porter training
 porter training review
@@ -218,6 +220,8 @@ Storage may be overridden with:
 SQL migrations are packaged with Porter and recorded in `schema_migrations`. Telemetry, task state, reminder state, persistent memory, training/recognition data, and cache state are stored locally in SQLite. Planner views are computed from task state rather than stored independently, and reliability reports are derived from existing request telemetry rather than persisted as a second source of truth.
 
 `porter backup create` uses SQLite's online backup API to create a consistent local snapshot under the Porter data directory by default. Each backup is integrity-checked before finalization and may be verified later with `porter backup verify`. `porter backup restore <backup> --destination <new-path>` recovers a verified, migrated copy without overwriting existing state. Replacing the active database remains deferred until all database writers can be stopped safely.
+
+Use `porter backup create --keep 14` to retain the new snapshot and the 13 newest previous snapshots after a successful backup. Without `--keep`, backups are not pruned. Daily scheduling is an opt-in setup using a systemd user timer; installing or updating Porter does not enable it. See [Local data protection](docs/architecture/local-data-protection.md) for retention safeguards, timer setup, and recovery instructions.
 
 ## Container runtime
 
@@ -325,7 +329,7 @@ GitHub Actions installs the external `qalc` executable and Porter's optional `tr
 - `docs/architecture/monitoring-stack.md` — Prometheus/Grafana/node_exporter deployment, dashboards, alert rules, persistence, and monitoring-network boundaries.
 - `docs/architecture/local-service-management.md` — systemd user-service installation, lifecycle, desktop-session autostart, and reminder delivery boundaries.
 - `docs/architecture/desktop-notifications.md` — tray-first reminder presentation, local IPC, fallback delivery, and notification ownership.
-- `docs/architecture/local-data-protection.md` — consistent local SQLite backups, verification, permissions, and restore safety.
+- `docs/architecture/local-data-protection.md` — local SQLite backups, retention, daily scheduling, and verified restore into a new database.
 - `THIRD_PARTY.md` — dependency, service, license, provenance, and adoption decisions.
 
 The top-level README describes current capabilities and operator-facing behavior. Architecture documents record stable boundaries and semantics; they should change when those contracts change rather than for every internal refactor.

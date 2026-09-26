@@ -1,0 +1,58 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "porter-ai"
+version = "0.1.0"
+description = "Local-first AI assistant and reliability engineering platform"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "hassil==3.11.0",
+  "home-assistant-intents==2026.7.30",
+  "prometheus-client==0.26.0",
+  "tzlocal==5.4.4",
+]
+
+[project.scripts]
+porter = "porter.cli.main:main"
+porter-service = "porter.cli.commands.service:main"
+porter-tray = "porter.cli.commands.tray:main"
+porter-web = "porter.cli.commands.web:main"
+
+[project.optional-dependencies]
+dev = [
+  "httpx2==2.9.0",
+  "pytest>=8",
+  "pytest-asyncio>=0.23",
+  "ruff>=0.6",
+]
+tray = [
+  "PySide6-Essentials==6.11.1",
+]
+web = [
+  "fastapi==0.141.1",
+  "uvicorn==0.52.3",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"porter.storage.sql" = ["*.sql"]
+"porter.web" = ["frontend/*.html", "frontend/*.css", "frontend/*.js"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+asyncio_mode = "auto"
+markers = [
+  "resilience: deterministic failure and recovery scenarios",
+]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]

@@ -1,0 +1,39 @@
+name: porter
+
+services:
+  web:
+    build:
+      context: .
+    image: porter:local
+    init: true
+    restart: unless-stopped
+    environment:
+      PORTER_DATA_DIR: /var/lib/porter
+      PORTER_WEB_HOST: 0.0.0.0
+      PORTER_LOG_LEVEL: ${PORTER_LOG_LEVEL:-INFO}
+      TZ: ${TZ:-Etc/UTC}
+      PORTER_SYNOPIC_TOKEN: ${PORTER_SYNOPIC_TOKEN:-}
+    ports:
+      - "127.0.0.1:${PORTER_WEB_PORT:-8000}:8000"
+    volumes:
+      - porter-data:/var/lib/porter
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/readyz', timeout=2).read()",
+        ]
+      interval: 10s
+      timeout: 3s
+      start_period: 5s
+      retries: 3
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    stop_grace_period: 15s
+
+volumes:
+  porter-data:

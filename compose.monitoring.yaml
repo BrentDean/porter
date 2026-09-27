@@ -1,4 +1,46 @@
 services:
+  alert-receiver:
+    image: python:3.12-slim
+    restart: unless-stopped
+    command:
+      - python
+      - /opt/porter/scripts/alert-receiver.py
+      - --host
+      - 0.0.0.0
+      - --port
+      - "9087"
+    ports:
+      - "127.0.0.1:${ALERT_RECEIVER_PORT:-9087}:9087"
+    volumes:
+      - ./scripts/alert-receiver.py:/opt/porter/scripts/alert-receiver.py:ro
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+  alertmanager:
+    image: prom/alertmanager:v0.34.1
+    restart: unless-stopped
+    depends_on:
+      alert-receiver:
+        condition: service_started
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+      - --storage.path=/alertmanager
+      - --web.listen-address=0.0.0.0:9093
+    ports:
+      - "127.0.0.1:${ALERTMANAGER_PORT:-9093}:9093"
+    volumes:
+      - ./ops/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager-data:/alertmanager
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
   node-exporter:
     image: prom/node-exporter:v1.12.1
     restart: unless-stopped
@@ -23,6 +65,8 @@ services:
       web:
         condition: service_healthy
       node-exporter:
+        condition: service_started
+      alertmanager:
         condition: service_started
     command:
       - --config.file=/etc/prometheus/prometheus.yml
@@ -66,4 +110,5 @@ services:
 
 volumes:
   prometheus-data:
+  alertmanager-data:
   grafana-data:

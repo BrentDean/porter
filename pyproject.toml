@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "porter-ai"
 version = "0.1.0"
-description = "Local-first AI assistant and reliability engineering platform"
+description = "Local-first AI and automation control plane with deterministic tooling and policy-governed inference"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [

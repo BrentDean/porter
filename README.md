@@ -2,11 +2,13 @@
 
 [![CI](https://github.com/BrentDean/porter/actions/workflows/ci.yml/badge.svg)](https://github.com/BrentDean/porter/actions/workflows/ci.yml)
 
-**A local-first AI assistant built as an observable, recoverable Python service—not just a chat interface.**
+**Porter is a local-first AI and automation control plane that routes natural-language requests through deterministic software before model inference.**
 
-Porter routes requests through deterministic intents and tools before considering model inference. It combines an interactive CLI and local browser interface with durable tasks, reminders and timers, a KDE desktop tray, and a background delivery worker. Local Ollama inference is optional; cloud fallback requires explicit per-request approval and policy eligibility.
+Rather than sending every request to an LLM, Porter separates recognition, authorization, execution, and inference. Known operations use deterministic tools and domain services; requests that require inference can use local Ollama or explicitly authorized cloud providers through policy-controlled routing.
 
-**Stack:** Python 3.11+ · SQLite · FastAPI · PySide6 · Docker/Compose · systemd · Prometheus · Grafana · pytest · Ruff · GitHub Actions
+The project is designed as an operational Linux service rather than a chatbot demo. It includes persistent tasks, reminders and timers, SQLite-backed state, background workers, Docker deployment, health/readiness endpoints, Prometheus/Grafana observability, structured logging, backup/restore, failure-injection testing, and desktop integration.
+
+**Stack:** Python 3.11+ · SQLite · FastAPI · Ollama · PySide6 · Docker/Compose · systemd · Prometheus · Grafana · pytest · Ruff · GitHub Actions
 
 **New here?** Follow the [five-minute project walkthrough](docs/project-walkthrough.md) for a reproducible demonstration of the request path, desktop timers, monitoring, and recovery.
 

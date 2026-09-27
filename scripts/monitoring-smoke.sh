@@ -5,6 +5,8 @@ project="${PORTER_MONITORING_SMOKE_PROJECT:-porter-monitoring-smoke}"
 porter_port="${PORTER_MONITORING_SMOKE_PORTER_PORT:-18002}"
 prometheus_port="${PORTER_MONITORING_SMOKE_PROMETHEUS_PORT:-19090}"
 grafana_port="${PORTER_MONITORING_SMOKE_GRAFANA_PORT:-13000}"
+alertmanager_port="${PORTER_MONITORING_SMOKE_ALERTMANAGER_PORT:-19093}"
+receiver_port="${PORTER_MONITORING_SMOKE_RECEIVER_PORT:-19087}"
 grafana_user="${GRAFANA_ADMIN_USER:-admin}"
 grafana_password="${GRAFANA_ADMIN_PASSWORD:-porter-monitoring-smoke}"
 
@@ -12,6 +14,8 @@ export COMPOSE_PROJECT_NAME="${project}"
 export PORTER_WEB_PORT="${porter_port}"
 export PROMETHEUS_PORT="${prometheus_port}"
 export GRAFANA_PORT="${grafana_port}"
+export ALERTMANAGER_PORT="${alertmanager_port}"
+export ALERT_RECEIVER_PORT="${receiver_port}"
 export GRAFANA_ADMIN_USER="${grafana_user}"
 export GRAFANA_ADMIN_PASSWORD="${grafana_password}"
 
@@ -45,6 +49,31 @@ cleanup
 wait_http "http://127.0.0.1:${porter_port}/readyz"
 wait_http "http://127.0.0.1:${prometheus_port}/-/ready"
 wait_http "http://127.0.0.1:${grafana_port}/api/health"
+wait_http "http://127.0.0.1:${alertmanager_port}/-/ready"
+wait_http "http://127.0.0.1:${receiver_port}/healthz"
+
+alertmanager_connected=false
+for _ in {1..30}; do
+    alertmanagers_json="$(curl --fail --silent --show-error \
+        "http://127.0.0.1:${prometheus_port}/api/v1/alertmanagers")"
+    if python - "${alertmanagers_json}" <<'PY'
+import json
+import sys
+
+payload = json.loads(sys.argv[1])
+active = payload["data"]["activeAlertmanagers"]
+raise SystemExit(0 if active else 1)
+PY
+    then
+        alertmanager_connected=true
+        break
+    fi
+    sleep 1
+done
+if [[ "${alertmanager_connected}" != "true" ]]; then
+    echo "Prometheus did not discover Alertmanager." >&2
+    exit 1
+fi
 
 targets_healthy=false
 for _ in {1..30}; do
@@ -95,6 +124,41 @@ if [[ "${dashboard_loaded}" != "true" ]]; then
     exit 1
 fi
 
+curl --fail --silent --show-error \
+    --request POST \
+    "http://127.0.0.1:${receiver_port}/reset" >/dev/null
+
+curl --fail --silent --show-error \
+    --header "Content-Type: application/json" \
+    --data '[{"labels":{"alertname":"PorterMonitoringSmoke","severity":"info"},"annotations":{"summary":"monitoring smoke alert"}}]' \
+    "http://127.0.0.1:${alertmanager_port}/api/v2/alerts" >/dev/null
+
+notification_delivered=false
+for _ in {1..30}; do
+    events_json="$(curl --fail --silent --show-error \
+        "http://127.0.0.1:${receiver_port}/events")"
+    if python - "${events_json}" <<'PY'
+import json
+import sys
+
+payload = json.loads(sys.argv[1])
+for event in payload["events"]:
+    webhook = event.get("payload", {})
+    for alert in webhook.get("alerts", []):
+        if alert.get("labels", {}).get("alertname") == "PorterMonitoringSmoke":
+            raise SystemExit(0)
+raise SystemExit(1)
+PY
+    then
+        notification_delivered=true
+        break
+    fi
+    sleep 1
+done
+if [[ "${notification_delivered}" != "true" ]]; then
+    echo "Alertmanager did not deliver the smoke alert to the local receiver." >&2
+    exit 1
+fi
 
 curl --fail --silent --show-error \
     --header "Content-Type: application/json" \

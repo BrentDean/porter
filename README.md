@@ -6,9 +6,9 @@
 
 Rather than sending every request to an LLM, Porter separates recognition, authorization, execution, and inference. Known operations use deterministic tools and domain services; requests that require inference can use local Ollama or explicitly authorized cloud providers through policy-controlled routing.
 
-The project is designed as an operational Linux service rather than a chatbot demo. It includes persistent tasks, reminders and timers, SQLite-backed state, background workers, Docker deployment, health/readiness endpoints, Prometheus/Grafana observability, structured logging, backup/restore, failure-injection testing, and desktop integration.
+The project is designed as an operational Linux service rather than a chatbot demo. It includes persistent tasks, reminders and timers, SQLite-backed state, background workers, Docker deployment, health/readiness endpoints, Prometheus/Grafana/Alertmanager observability, structured logging, backup/restore, failure-injection testing, and desktop integration.
 
-**Stack:** Python 3.11+ · SQLite · FastAPI · Ollama · PySide6 · Docker/Compose · systemd · Prometheus · Grafana · pytest · Ruff · GitHub Actions
+**Stack:** Python 3.11+ · SQLite · FastAPI · Ollama · PySide6 · Docker/Compose · systemd · Prometheus · Alertmanager · Grafana · pytest · Ruff · GitHub Actions
 
 **New here?** Follow the [five-minute project walkthrough](docs/project-walkthrough.md) for a reproducible demonstration of the request path, desktop timers, monitoring, and recovery.
 
@@ -29,7 +29,7 @@ The web interface and monitoring UIs run on **localhost by default**. Porter is 
 | --- | --- | --- |
 | **Application architecture** | Separate request dispatch, authorization/policy, provider selection, execution, and persistence. | [Separation of duties](docs/architecture/0001-separation-of-duties.md) · [Request and web API](docs/architecture/web-api.md) |
 | **Reliability** | Retry/backoff, atomic reminder claims, stale-claim recovery, provider failure/fallback tests, graceful shutdown, and latency/error-budget reporting. | [Resilience tests](docs/architecture/resilience-testing.md) · [Reliability reporting](docs/architecture/reliability-reporting.md) |
-| **Operations** | Health/readiness endpoints, bounded Prometheus metrics, structured JSON logs, Grafana dashboard, alert rules, and container monitoring smoke tests. | [Monitoring stack](docs/architecture/monitoring-stack.md) · [Structured logging](docs/architecture/structured-logging.md) |
+| **Operations** | Health/readiness endpoints, bounded Prometheus metrics, structured JSON logs, Grafana dashboard, alert rules, Alertmanager webhook delivery, and a reproducible outage/recovery drill. | [Monitoring stack](docs/architecture/monitoring-stack.md) · [Structured logging](docs/architecture/structured-logging.md) |
 | **Data protection** | Online SQLite snapshots, integrity verification, optional retention, and restore to a *new* database without replacing live state. | [Local data protection](docs/architecture/local-data-protection.md) · [Backup tests](tests/test_backup.py) |
 | **Desktop integration** | systemd user worker, KDE/XDG tray autostart, private Unix-socket notifications, and a `notify-send` fallback. | [Service management](docs/architecture/local-service-management.md) · [Desktop notifications](docs/architecture/desktop-notifications.md) |
 | **Automated verification** | Python 3.11/3.12 tests, Ruff, a dedicated fault-injection test slice, container and monitoring smoke tests, and publication/secret scans. | [CI](.github/workflows/ci.yml) · [Publication verification](.github/workflows/publication-verification.yml) |
@@ -91,7 +91,7 @@ To add the local monitoring stack, **first set a unique `GRAFANA_ADMIN_PASSWORD`
 docker compose -f compose.yaml -f compose.monitoring.yaml up --build -d
 ```
 
-Prometheus is then available on host loopback port `9090` and Grafana on `3000`.
+Prometheus is then available on host loopback port `9090`, Alertmanager on `9093`, the local alert receiver on `9087`, and Grafana on `3000`. Run `bash scripts/monitoring-outage-drill.sh` for an isolated stop/detect/restart/resolve demonstration.
 
 ## Local-first and safety design
 

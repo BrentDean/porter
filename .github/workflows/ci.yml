@@ -92,5 +92,12 @@ jobs:
             --volume "$PWD/ops/prometheus:/etc/prometheus:ro" \
             prom/prometheus:v3.14.0 \
             check config /etc/prometheus/prometheus.yml
+      - name: Validate Alertmanager configuration
+        run: |
+          docker run --rm \
+            --entrypoint /bin/amtool \
+            --volume "$PWD/ops/alertmanager:/etc/alertmanager:ro" \
+            prom/alertmanager:v0.34.1 \
+            check-config /etc/alertmanager/alertmanager.yml
       - name: Run monitoring stack smoke test
         run: bash scripts/monitoring-smoke.sh

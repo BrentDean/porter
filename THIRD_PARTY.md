@@ -121,6 +121,18 @@ This file is also Porter's upstream reuse and provenance ledger.
 - Network scope: published on host loopback only by the supplied Compose overlay
 - Review date: 2026-09-18
 
+### Prometheus Alertmanager
+
+- Image: `prom/alertmanager:v0.34.1`
+- Upstream: prometheus/alertmanager
+- License: Apache-2.0
+- Status: optional operational alert-routing runtime
+- Use: receive Prometheus alerts, group them, and deliver firing/resolved notifications to Porter's local webhook receiver
+- Porter boundary: `compose.monitoring.yaml` and `ops/alertmanager/`
+- Network scope: UI/API published on host loopback only; the default webhook target is the Compose-network-local `alert-receiver` service
+- HA scope: clustering is disabled for the supplied single-node local monitoring stack
+- Review date: 2026-09-27
+
 ### Prometheus node_exporter
 
 - Image: `prom/node-exporter:v1.12.1`

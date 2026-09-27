@@ -46,12 +46,14 @@ wait_http() {
 
 event_received() {
     local expected_status="$1"
-    curl --fail --silent --show-error         "http://127.0.0.1:${receiver_port}/events"         | python - "${expected_status}" <<'PY'
+    local events_json
+    events_json="$(curl --fail --silent --show-error "http://127.0.0.1:${receiver_port}/events")"
+    python - "${expected_status}" "${events_json}" <<'PY'
 import json
 import sys
 
 expected_status = sys.argv[1]
-payload = json.load(sys.stdin)
+payload = json.loads(sys.argv[2])
 for event in payload["events"]:
     webhook = event.get("payload", {})
     if webhook.get("status") != expected_status:

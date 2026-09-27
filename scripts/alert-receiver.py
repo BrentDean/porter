@@ -9,6 +9,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from threading import Lock
 from typing import Any
 
+_MAX_EVENTS = 1000
 _EVENTS: list[dict[str, Any]] = []
 _EVENTS_LOCK = Lock()
 
@@ -48,7 +49,7 @@ class AlertReceiverHandler(BaseHTTPRequestHandler):
             content_length = int(self.headers.get("Content-Length", "0"))
             raw_body = self.rfile.read(content_length)
             payload = json.loads(raw_body)
-        except (ValueError, json.JSONDecodeError):
+        except ValueError:
             self._write_json(HTTPStatus.BAD_REQUEST, {"detail": "invalid JSON"})
             return
 
@@ -66,6 +67,7 @@ class AlertReceiverHandler(BaseHTTPRequestHandler):
                     "payload": payload,
                 }
             )
+            del _EVENTS[:-_MAX_EVENTS]
 
         self._write_json(HTTPStatus.ACCEPTED, {"status": "accepted"})
 

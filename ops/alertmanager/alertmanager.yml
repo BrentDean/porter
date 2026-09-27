@@ -1,0 +1,14 @@
+route:
+  receiver: porter-local-webhook
+  group_by:
+    - alertname
+  group_wait: 5s
+  group_interval: 15s
+  repeat_interval: 4h
+
+receivers:
+  - name: porter-local-webhook
+    webhook_configs:
+      - url: http://alert-receiver:9087/alerts
+        send_resolved: true
+        timeout: 10s

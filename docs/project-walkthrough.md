@@ -75,11 +75,19 @@ Set a unique nonempty `GRAFANA_ADMIN_PASSWORD` in your local, untracked `.env` f
 docker compose -f compose.yaml -f compose.monitoring.yaml up --build -d
 ```
 
-Open Grafana at `http://127.0.0.1:3000` and select **Dashboards → Porter → Porter Operations**. Prometheus is available at `http://127.0.0.1:9090`. After one or two 15-second scrape intervals, request count, errors, and request latency panels should reflect API traffic. Provider/cache panels can show no data when only deterministic requests have executed.
+Open Grafana at `http://127.0.0.1:3000` and select **Dashboards → Porter → Porter Operations**. Prometheus is available at `http://127.0.0.1:9090`, Alertmanager at `http://127.0.0.1:9093`, and the local alert receiver at `http://127.0.0.1:9087/events`. After one or two 15-second scrape intervals, request count, errors, and request latency panels should reflect API traffic. Provider/cache panels can show no data when only deterministic requests have executed.
 
-The repository provisions the [dashboard](../ops/grafana/dashboards/porter-operations.json) and [Prometheus alert rules](../ops/prometheus/rules/porter-alerts.yml). Rules do not by themselves configure an outbound paging channel.
+The repository provisions the [dashboard](../ops/grafana/dashboards/porter-operations.json), [Prometheus alert rules](../ops/prometheus/rules/porter-alerts.yml), and [Alertmanager routing](../ops/alertmanager/alertmanager.yml). The default receiver is local and secret-free; it is intended to demonstrate notification delivery rather than replace an external paging service.
 
-**Inspect:** [Monitoring runbook](architecture/monitoring-stack.md), [monitoring smoke test](../scripts/monitoring-smoke.sh).
+For a real failure-and-recovery path, run:
+
+```bash
+bash scripts/monitoring-outage-drill.sh
+```
+
+The drill uses an isolated Compose project, stops Porter long enough for the existing `PorterTargetDown` rule to fire, records the firing webhook, restarts Porter, verifies readiness, and records the resolved webhook. It prints measured detection and recovery-notification times.
+
+**Inspect:** [Monitoring runbook](architecture/monitoring-stack.md), [monitoring smoke test](../scripts/monitoring-smoke.sh), [outage/recovery drill](../scripts/monitoring-outage-drill.sh).
 
 ## 5. Demonstrate recovery without overwriting the live database
 

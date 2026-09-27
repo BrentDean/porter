@@ -95,7 +95,7 @@ jobs:
       - name: Validate Alertmanager configuration
         run: |
           docker run --rm \
-            --entrypoint /bin/amtool \
+            --entrypoint amtool \
             --volume "$PWD/ops/alertmanager:/etc/alertmanager:ro" \
             prom/alertmanager:v0.34.1 \
             check-config /etc/alertmanager/alertmanager.yml

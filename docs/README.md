@@ -21,7 +21,7 @@ Porter's documentation is split by purpose so implementation changes do not requ
 - [Resilience testing](architecture/resilience-testing.md) — deterministic fault-injection scenarios and recovery contracts.
 - [Container runtime](architecture/container-runtime.md) — Docker/Compose runtime, persistence, binding, health semantics, runtime hardening, and smoke testing.
 - [Structured logging](architecture/structured-logging.md) — JSON operational events, privacy boundaries, lifecycle isolation, and log/metric/telemetry responsibilities.
-- [Monitoring stack](architecture/monitoring-stack.md) — Prometheus, Grafana, node_exporter, dashboards, alert rules, persistence, and monitoring-network boundaries.
+- [Monitoring stack](architecture/monitoring-stack.md) — Prometheus, Alertmanager, Grafana, node_exporter, local alert delivery, outage/recovery drills, persistence, and monitoring-network boundaries.
 - [Local service management](architecture/local-service-management.md) — systemd reminder-service lifecycle and desktop-session tray autostart.
 - [Desktop notifications](architecture/desktop-notifications.md) — tray-first reminder presentation, private local IPC, and `notify-send` fallback.
 - [Local data protection](architecture/local-data-protection.md) — online SQLite backups, integrity verification, private file permissions, and the offline restore boundary.

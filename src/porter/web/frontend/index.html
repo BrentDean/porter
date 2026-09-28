@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Porter</title>
+  <link rel="stylesheet" href="/styles.css?v=2">
+  <script src="/app.js?v=2" defer></script>
+</head>
+<body>
+  <main class="app-shell" data-porter-ui="local-chat">
+    <header class="app-header">
+      <div>
+        <p class="eyebrow">Local assistant</p>
+        <h1>Porter</h1>
+      </div>
+      <div class="status-badge" aria-label="Porter is running locally">
+        <span class="status-dot" aria-hidden="true"></span>
+        Local
+      </div>
+    </header>
+
+    <section
+      id="transcript"
+      class="transcript"
+      aria-label="Conversation"
+      aria-live="polite"
+    >
+      <article class="message message-porter">
+        <div class="message-label">Porter</div>
+        <p>Ready. Porter tries deterministic handling first, then local AI when needed.</p>
+      </article>
+    </section>
+
+    <form id="composer" class="composer" autocomplete="off">
+      <label class="sr-only" for="prompt">Message Porter</label>
+      <textarea
+        id="prompt"
+        name="prompt"
+        rows="2"
+        placeholder="Ask Porter…"
+        aria-describedby="composer-help"
+      ></textarea>
+      <button id="send-button" type="submit">Send</button>
+    </form>
+    <p id="composer-help" class="composer-help">Enter to send · Shift+Enter for a new line</p>
+  </main>
+</body>
+</html>

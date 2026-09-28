@@ -1,0 +1,47 @@
+name: Publication verification
+
+on:
+  push:
+    branches: [audit/publication-readiness-20260924]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout complete reachable history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Fetch repository branches and tags for history inspection
+        run: |
+          git fetch --prune origin '+refs/heads/*:refs/remotes/origin/*'
+          git fetch --tags origin
+          printf 'Current branch objects: '
+          git rev-list --all --count
+
+      - name: Check current source and Git-history privacy patterns
+        run: python3 scripts/publication-audit.py
+
+      - name: Scan reachable Git history for secrets
+        if: always()
+        run: |
+          docker run --rm --volume "$PWD:/repo:ro" \
+            ghcr.io/gitleaks/gitleaks:latest \
+            git --redact --log-opts="--all" /repo
+
+      - name: Scan current files and nested archives for secrets
+        if: always()
+        run: |
+          docker run --rm --volume "$PWD:/repo:ro" \
+            ghcr.io/gitleaks/gitleaks:latest \
+            dir --redact --max-archive-depth=2 /repo
+

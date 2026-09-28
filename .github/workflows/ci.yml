@@ -1,0 +1,103 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      QT_QPA_PLATFORM: offscreen
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install system dependencies
+        run: |
+          if [ -f /etc/apt/apt-mirrors.txt ]; then
+            sudo sed -i \
+              's|http://azure.archive.ubuntu.com/ubuntu|https://archive.ubuntu.com/ubuntu|g' \
+              /etc/apt/apt-mirrors.txt
+          fi
+          sudo timeout 180s apt-get \
+            -o Acquire::Retries=3 \
+            -o Acquire::http::Timeout=30 \
+            -o Acquire::https::Timeout=30 \
+            update
+          sudo timeout 180s apt-get \
+            -o Acquire::Retries=3 \
+            -o Acquire::http::Timeout=30 \
+            -o Acquire::https::Timeout=30 \
+            install -y qalc libegl1
+      - run: python -m pip install --upgrade pip
+      - run: python -m pip install -e '.[dev,tray,web]'
+      - run: ruff check .
+      - name: Run resilience suite
+        run: pytest -q -m resilience
+      - run: pytest -q
+
+
+  container:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Compose
+        run: docker compose config
+      - name: Build Porter image
+        run: docker build --tag porter:ci .
+      - name: Run container smoke test
+        env:
+          PORTER_CONTAINER_IMAGE: porter:ci
+        run: bash scripts/container-smoke.sh
+      - name: Run Compose startup smoke test
+        env:
+          COMPOSE_PROJECT_NAME: porter-ci-smoke
+          PORTER_WEB_PORT: "18001"
+        run: |
+          set -euo pipefail
+          cleanup() {
+            docker compose down --volumes --remove-orphans >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+          cleanup
+          docker compose up --build --detach --wait
+          curl --fail --silent --show-error http://127.0.0.1:18001/healthz
+          curl --fail --silent --show-error http://127.0.0.1:18001/readyz
+          docker compose ps | cat
+
+
+  monitoring:
+    needs: container
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate monitoring Compose
+        env:
+          GRAFANA_ADMIN_PASSWORD: ci-config-validation-only
+        run: docker compose -f compose.yaml -f compose.monitoring.yaml config
+      - name: Validate Prometheus configuration
+        run: |
+          docker run --rm \
+            --entrypoint /bin/promtool \
+            --volume "$PWD/ops/prometheus:/etc/prometheus:ro" \
+            prom/prometheus:v3.14.0 \
+            check config /etc/prometheus/prometheus.yml
+      - name: Validate Alertmanager configuration
+        run: |
+          docker run --rm \
+            --entrypoint amtool \
+            --volume "$PWD/ops/alertmanager:/etc/alertmanager:ro" \
+            prom/alertmanager:v0.34.1 \
+            check-config /etc/alertmanager/alertmanager.yml
+      - name: Run monitoring stack smoke test
+        run: bash scripts/monitoring-smoke.sh

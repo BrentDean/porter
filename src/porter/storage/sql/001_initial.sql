@@ -1,0 +1,5 @@
+-- Initial Porter schema.
+--
+-- Application tables are intentionally deferred. The migration runner owns
+-- schema versioning before telemetry, planner, memory, cache, or event tables
+-- are introduced.
